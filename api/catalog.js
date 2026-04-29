@@ -72,7 +72,7 @@ module.exports = async (req, res) => {
         module_area_m2: params["Площадь модуля (м2)"] || null,
         pack_qty_m2: params["Количество в упаковке (м2)"] || null,
         pack_qty_pcs: params["Количиество в упаковке (шт)"] || null,
-        stock_m2: parseFloat(params["Доступное количество"]) || 0,
+        stock_m2: parseFloat(String(params["Доступное количество"] || "0").replace(",", ".")) || 0,
         base: params["Основа"] || null,
       };
     });
