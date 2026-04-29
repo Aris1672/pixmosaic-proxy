@@ -45,13 +45,10 @@ function parseNumber(value, { fallback = null, logKey = "" } = {}) {
 
   let raw = String(value).replace(/\u00A0/g, "").trim();
 
-  // Handle European/Russian formats where dot might be a thousands separator 
-  // and comma is a decimal, or vice versa.
+  // Handle formats where dot might be a thousands separator and comma is a decimal
   if (raw.includes('.') && raw.includes(',')) {
-    // If both exist, assume comma is decimal (common in RU)
     raw = raw.replace(/\./g, '').replace(',', '.');
   } else {
-    // Otherwise, just swap comma to dot
     raw = raw.replace(',', '.');
   }
 
@@ -81,7 +78,6 @@ function extractParams(paramField) {
   const list = Array.isArray(paramField) ? paramField : [paramField];
 
   list.forEach((p) => {
-    // Normalize the key so we don't miss it due to encoding or typos
     const key = normalizeKey(p.name);
     const value = normalizeParamValue(p);
     if (key) params[key] = value;
@@ -120,21 +116,23 @@ module.exports = async (req, res) => {
     const products = offers.map((offer) => {
       const params = extractParams(offer.param);
 
-      // Using the normalized lowercase key to find stock
-      const stockKey = "доступное количество";
-      const stockRaw = params[stockKey];
+      // --- FUZZY STOCK LOOKUP ---
+      // Instead of an exact match, find ANY key that contains "доступное"
+      const foundStockKey = Object.keys(params).find(k => k.includes("доступное"));
+      const stockRaw = foundStockKey ? params[foundStockKey] : undefined;
 
       const stock = parseNumber(stockRaw, {
         fallback: 0,
         logKey: `stock (offer ${offer.id})`,
       });
 
-      // Debugging PIX 305 specifically
+      // Specific Debug for PIX 305
       if (offer.id === "872") {
         console.log("--- DEBUG 872 ---");
-        console.log("Raw params keys:", Object.keys(params));
-        console.log("Found stock raw:", JSON.stringify(stockRaw));
-        console.log("Parsed stock:", stock);
+        console.log("All Keys found in XML for this item:", Object.keys(params));
+        console.log("Matched Key Name:", foundStockKey);
+        console.log("Raw Value from XML:", JSON.stringify(stockRaw));
+        console.log("Final Parsed Stock:", stock);
       }
 
       return {
@@ -148,7 +146,6 @@ module.exports = async (req, res) => {
         model: cleanString(offer.model),
         description: cleanString(offer.description),
 
-        // Mapping using normalized lowercase keys
         article: cleanString(params["артикул"]),
         material: cleanString(params["материал"]),
         surface: cleanString(params["поверхность"]),
@@ -160,7 +157,7 @@ module.exports = async (req, res) => {
         module_area_m2: parseNumber(params["площадь модуля (м2)"], { fallback: null }),
         pack_qty_m2: parseNumber(params["количество в упаковке (м2)"], { fallback: null }),
         
-        // Handling the specific typo in your XML: "Количиество"
+        // Handling both the typo "количиество" and the correct "количество"
         pack_qty_pcs: parseNumber(
           params["количиество в упаковке (шт)"] || params["количество в упаковке (шт)"],
           { fallback: null }
